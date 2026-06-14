@@ -1,5 +1,8 @@
 #pragma once
 #include "common.h"
+#include <winver.h>   // °æ±¾ API
+
+#pragma comment(lib, "Version.lib")
 
 ////
 // 
@@ -18,9 +21,67 @@ public:
 	virtual void SetIndentValue(int indent) = 0;
 };
 
-UINT (__fastcall*fGetDpiForWindow)(HWND hwnd);
-DPI_AWARENESS_CONTEXT (__fastcall*fGetWindowDpiAwarenessContext)(HWND hwnd);
-BOOL (__fastcall*fAreDpiAwarenessContextsEqual)(DPI_AWARENESS_CONTEXT A, DPI_AWARENESS_CONTEXT B);
+UINT(__fastcall* fGetDpiForWindow)(HWND hwnd);
+DPI_AWARENESS_CONTEXT(__fastcall* fGetWindowDpiAwarenessContext)(HWND hwnd);
+BOOL(__fastcall* fAreDpiAwarenessContextsEqual)(DPI_AWARENESS_CONTEXT A, DPI_AWARENESS_CONTEXT B);
+
+static void GetExplorerFrameVersion(DWORD& buildNumber, DWORD& buildRevision) {
+	static DWORD cachedBuild = 0;
+	static DWORD cachedRevision = 0;
+	static BOOL initialized = FALSE;
+
+	if (initialized) {
+		buildNumber = cachedBuild;
+		buildRevision = cachedRevision;
+		return;
+	}
+
+	buildNumber = 0;
+	buildRevision = 0;
+
+	HMODULE hMod = GetModuleHandleW(L"ExplorerFrame.dll");
+	if (!hMod) {
+		hMod = LoadLibraryW(L"ExplorerFrame.dll");
+	}
+	if (!hMod) return;
+
+	WCHAR path[MAX_PATH];
+	if (!GetModuleFileNameW(hMod, path, MAX_PATH)) return;
+
+	DWORD verSize = GetFileVersionInfoSizeW(path, NULL);
+	if (verSize == 0) return;
+
+	BYTE* pData = (BYTE*)HeapAlloc(GetProcessHeap(), 0, verSize);
+	if (!pData) return;
+
+	if (GetFileVersionInfoW(path, 0, verSize, pData)) {
+		VS_FIXEDFILEINFO* pFileInfo = NULL;
+		UINT len = 0;
+		if (VerQueryValueW(pData, L"\\", (VOID**)&pFileInfo, &len)) {
+			if (pFileInfo) {
+				cachedBuild = HIWORD(pFileInfo->dwFileVersionLS);
+				cachedRevision = LOWORD(pFileInfo->dwFileVersionLS);
+				buildNumber = cachedBuild;
+				buildRevision = cachedRevision;
+			}
+		}
+	}
+
+	HeapFree(GetProcessHeap(), 0, pData);
+	initialized = TRUE;
+}
+
+static int GetExtraOffset() {
+	DWORD buildNumber, buildRevision;
+	GetExplorerFrameVersion(buildNumber, buildRevision);
+
+	if (buildNumber >= 26100 || (buildNumber >= 22621 && buildRevision >= 4111))
+		return 16;
+	else if (buildNumber >= 21996)
+		return 8;
+	else
+		return 0;
+}
 
 static void __fastcall SHComputeDPI(HWND a1, int* a2, int* a3)
 {
@@ -64,12 +125,7 @@ static void __fastcall CNscTree_ScaleAndSetIndent(__int64 a1)
 	int v3; // eax
 	int nNumerator; // [rsp+30h] [rbp+8h] BYREF
 	int v6; // [rsp+38h] [rbp+10h] BYREF
-	int extraOffset = 0;
-
-	if (g_osVersion.BuildNumber() >= 26100 || (g_osVersion.BuildNumber() >= 22621 && g_osVersion.BuildRevision() >= 4111)) // Ittr: Handle windows 11 offset difference. Inefficient but simplified code wasnt working
-		extraOffset = 16;
-	else if (g_osVersion.BuildNumber() >= 21996)
-		extraOffset = 8;
+	int extraOffset = GetExtraOffset();
 
 	v1 = *(DWORD*)(a1 + 0x1D0 + extraOffset);
 	SHComputeDPI(*(HWND*)(a1 + 0x188 + extraOffset), &v6, &nNumerator);
@@ -79,12 +135,7 @@ static void __fastcall CNscTree_ScaleAndSetIndent(__int64 a1)
 
 static void __fastcall CNscTree_SetIndentValue(__int64 a1, int a2)
 {
-	int extraOffset = 0;
-
-	if (g_osVersion.BuildNumber() >= 26100 || (g_osVersion.BuildNumber() >= 22621 && g_osVersion.BuildRevision() >= 4111)) // Ittr: Handle windows 11 offset difference. Inefficient but simplified code wasnt working
-		extraOffset = 16;
-	else if (g_osVersion.BuildNumber() >= 21996)
-		extraOffset = 8;
+	int extraOffset = GetExtraOffset();
 
 	*(DWORD*)(a1 + 0xA0 + extraOffset) = a2;
 	CNscTree_ScaleAndSetIndent(a1 - 304);
@@ -99,12 +150,7 @@ static void __fastcall CNscTree_ScaleAndSetRowHeight(__int64 a1)
 	HDC v7; // rbx
 	int DeviceCaps; // edi
 	int v9; // eax
-	int extraOffset = 0;
-
-	if (g_osVersion.BuildNumber() >= 26100 || (g_osVersion.BuildNumber() >= 22621 && g_osVersion.BuildRevision() >= 4111)) // Ittr: Handle windows 11 offset difference. Inefficient but simplified code wasnt working
-		extraOffset = 16;
-	else if (g_osVersion.BuildNumber() >= 21996)
-		extraOffset = 8;
+	int extraOffset = GetExtraOffset();
 
 	v1 = *(DWORD*)(a1 + 0x1C8 + extraOffset);
 	v2 = *(HWND*)(a1 + 0x188 + extraOffset);
@@ -133,12 +179,7 @@ static void __fastcall CNscTree_ScaleAndSetRowHeight(__int64 a1)
 
 static __int64 __fastcall CNscTree_SetItemHeight(__int64 a1, int a2)
 {
-	int extraOffset = 0;
-
-	if (g_osVersion.BuildNumber() >= 26100 || (g_osVersion.BuildNumber() >= 22621 && g_osVersion.BuildRevision() >= 4111)) // Ittr: Handle windows 11 offset difference. Inefficient but simplified code wasnt working
-		extraOffset = 16;
-	else if (g_osVersion.BuildNumber() >= 21996)
-		extraOffset = 8;
+	int extraOffset = GetExtraOffset();
 
 	*(DWORD*)(a1 + 200 + extraOffset) = a2;
 	CNscTree_ScaleAndSetRowHeight(a1 - 256);
@@ -149,7 +190,7 @@ extern HRESULT(__fastcall* CNSCHost_FillNSCOg)(uintptr_t nscHost);
 static HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the filter from 7 shell32, CLSID_PersonalStartMenu GUID_2659b475_eeb8_48b7_8f07_b378810f48cf
 {
 	const int indentValue = 13;
-	const int itemHeight = 19;
+	const int itemHeight = 21;
 
 	bool isFilled = *(DWORD*)(nscHost + 0xCC);
 	HRESULT result = CNSCHost_FillNSCOg(nscHost);
@@ -168,7 +209,9 @@ static HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplemen
 		IVisualProperties* visualProps = (IVisualProperties*)(__int64(control) + 0x20);
 		INameSpaceTreeControlValuesPrivate* privatec = (INameSpaceTreeControlValuesPrivate*)(__int64(control) + 0x50);
 
-		if (g_osVersion.BuildNumber() < 14393) // handle TH1 and TH2 - less explorerframe modding exists, so should be fine
+		DWORD buildNumber, buildRevision;
+		GetExplorerFrameVersion(buildNumber, buildRevision);
+		if (buildNumber < 14393) // handle TH1 and TH2 - less explorerframe modding exists, so should be fine
 		{
 			privatec->SetIndentValue(indentValue);
 			visualProps->SetItemHeight(itemHeight);
@@ -179,6 +222,6 @@ static HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplemen
 			CNscTree_SetItemHeight((uintptr_t)visualProps, itemHeight);
 		}
 	}
-	
+
 	return result;
 }
