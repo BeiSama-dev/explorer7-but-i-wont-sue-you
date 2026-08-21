@@ -142,7 +142,6 @@ IPinManagerInterop : IUnknown
 	virtual HRESULT STDMETHODCALLTYPE PinItemToTaskbarShim(PCUIDLIST_ABSOLUTE, PINNEDLISTMODIFYCALLER) = 0;
 	virtual HRESULT STDMETHODCALLTYPE PinItemFromTrustedCaller(PCUIDLIST_ABSOLUTE, PINNEDLISTMODIFYCALLER) = 0;
 	virtual HRESULT STDMETHODCALLTYPE ApplyPrependDefaultTaskbarLayout() = 0;
-	virtual HRESULT STDMETHODCALLTYPE ApplyAppendDefaultTaskbarLayout() = 0; // @Warning: This appeared somewhere after the time of 22621.1992's release
 	virtual HRESULT STDMETHODCALLTYPE ApplyInPlaceTaskbarLayout(TaskbarLayoutType) = 0;
 	virtual HRESULT STDMETHODCALLTYPE ApplyReorderTaskbarLayout(TaskbarLayoutType, int) = 0;
 };
@@ -157,7 +156,7 @@ IPinManagerInterop2 : IPinManagerInterop
 class CPinnedListWrapper : public IPinnedList2
 {
 public:
-	CPinnedListWrapper(IUnknown*, int);
+	CPinnedListWrapper(IUnknown*, int, PINNEDLISTMODIFYCALLER);
 	~CPinnedListWrapper();
 
 	//IUnknown
@@ -178,10 +177,13 @@ public:
 	STDMETHODIMP ItemChangeNotify(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE);
 	STDMETHODIMP UpdateForRemovedItemsAsNecessary(VOID);
 private:
+	HRESULT ModifyUsingTaskbandInternal(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE);
+
 	IFlexibleTaskbarPinnedList* m_flexList = 0;
 	IPinnedList3* m_pinnedList3 = 0;
 	IPinnedList25* m_pinnedList25 = 0;
 	IPinManagerInterop* m_pinManager;
 
 	int m_build = 0;
+	PINNEDLISTMODIFYCALLER m_modifyCaller = PMC_STARTMENU;
 };

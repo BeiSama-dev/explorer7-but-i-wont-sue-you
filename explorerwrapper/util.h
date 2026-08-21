@@ -107,22 +107,14 @@ __int64 GetScreenDpi(void)
 	return (unsigned int)g_nScreenDpi;
 }
 
-// this setup is created so that SetWindowTheme can apply Windows 8-era classes without causing crashing
+// Retained for the legacy SetWindowTheme import wrapper. The scoped theme
+// hooks no longer update this value globally.
 extern HTHEME g_currentTheme = 0;
 
 void LoadCurrentTheme(HWND hwnd, LPCWSTR pszClassList)
 {
-	g_currentTheme = 0;
-	DWORD flags = 2;
-	if ((unsigned int)GetScreenDpi() != 96)
-		flags |= 1u;
-
-	if (g_loadedTheme)
-		g_currentTheme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassList, flags);
-	else
-		g_currentTheme = fOpenThemeData(hwnd, pszClassList);
+	g_currentTheme = fOpenThemeData(hwnd, pszClassList);
 }
-
 // Ittr: Forcing this change fixes colorization on aero.msstyles for 1809+ on taskbar and start menu ONLY.
 void EnsureWindowColorization()
 {
@@ -568,12 +560,12 @@ BOOL WINAPI SetWindowBandNew(HWND hwnd, HWND hwndInsertAfter, DWORD flags)
 
 BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
 {
-	BOOL res = RegisterHotKeyApiOrg(hwnd, id, mod, vk);
-
-	if (!res)
-	{
-		return TRUE;
-	}
-
+    if (g_osVersion.BuildNumber() >= 22000 && g_osVersion.BuildNumber() < 22621)
+    {
+        bool isStartHotkey = (((mod & MOD_WIN) && vk == 0) || vk == VK_LWIN || vk == VK_RWIN || ((mod & MOD_CONTROL) && vk == VK_ESCAPE));
+        if (isStartHotkey && !hwnd)
+            hwnd = GetTaskbarWnd();
+    }
+	RegisterHotKeyApiOrg(hwnd, id, mod, vk);
 	return TRUE;
 }
